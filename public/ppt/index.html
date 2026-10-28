@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Graph Architecture</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%230b5cad%22/%3E%3Ctext x=%2216%22 y=%2221%22 font-size=%2213%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22monospace%22%3EWB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f4ef; --panel: #fffdf8; --ink: #1b1d22; --ink-2: #4a4f59; --muted: #7d828c; --line: #e4e0d6;
+  --accent: #0b5cad; --accent-soft: #e3eefa; --jev: #6a3fd1; --jev-soft: #efe9fc; --glm: #b35c00; --glm-soft: #fbeedd;
+  --good: #1f7a4d; --good-soft: #e2f3ea; --stage: #e9e6de;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif; --serif: 'Newsreader', Georgia, serif; --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1e23; --panel: #23272d; --ink: #ecebe7; --ink-2: #c3c4c7; --muted: #8b8f97; --line: #343941;
+    --accent: #6aa8ec; --accent-soft: #1d2b3b; --jev: #b195ff; --jev-soft: #2a2340; --glm: #f0a35a; --glm-soft: #3a2a18;
+    --good: #5fcf96; --good-soft: #17301f; --stage: #121417;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1e23; --panel: #23272d; --ink: #ecebe7; --ink-2: #c3c4c7; --muted: #8b8f97; --line: #343941;
+  --accent: #6aa8ec; --accent-soft: #1d2b3b; --jev: #b195ff; --jev-soft: #2a2340; --glm: #f0a35a; --glm-soft: #3a2a18;
+  --good: #5fcf96; --good-soft: #17301f; --stage: #121417;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--stage); color: var(--ink); font: 16px/1.5 var(--sans); overflow: hidden; }
+
+/* Fixed 1600x900 canvas, scaled to fit the window. */
+#viewport { position: fixed; inset: 0 0 50px 0; }
+#deck { width: 1600px; height: 900px; position: absolute; left: 50%; top: 50%; transform-origin: center center; }
+.slide { position: absolute; inset: 0; background: var(--bg); border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,.18);
+  padding: 72px 96px; display: none; flex-direction: column; overflow: hidden; }
+.slide.active { display: flex; }
+.slide .kicker { font: 600 15px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+.slide h1 { font: 500 76px/1.04 var(--serif); margin: 0 0 24px; letter-spacing: -.015em; }
+.slide h2 { font: 500 50px/1.1 var(--serif); margin: 0 0 30px; letter-spacing: -.01em; max-width: 1300px; }
+.slide p.lead { font-size: 26px; line-height: 1.45; color: var(--ink-2); max-width: 1180px; margin: 0; }
+.slide .foot { position: absolute; left: 96px; right: 96px; bottom: 34px; display: flex; justify-content: space-between; font: 13px var(--mono); color: var(--muted); }
+.cols { display: grid; gap: 28px; flex: 1; min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 28px; }
+.card h3 { font: 600 21px var(--sans); margin: 0 0 10px; }
+.card p, .card li { font-size: 18.5px; color: var(--ink-2); margin: 0; line-height: 1.5; }
+.card ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.tag { display: inline-block; font: 500 14px var(--mono); padding: 3px 10px; border-radius: 6px; }
+.tag.jev { background: var(--jev-soft); color: var(--jev); }
+.tag.glm { background: var(--glm-soft); color: var(--glm); }
+.tag.acc { background: var(--accent-soft); color: var(--accent); }
+.tag.good { background: var(--good-soft); color: var(--good); }
+.big { font: 500 64px/1 var(--mono); letter-spacing: -.02em; }
+.stat-label { font-size: 17px; color: var(--muted); margin-top: 8px; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+svg text { font-family: var(--sans); }
+
+/* Title slide */
+.title-slide { justify-content: center; }
+.title-slide .mark { width: 76px; height: 76px; border-radius: 16px; background: var(--accent); color: #fff; display: grid; place-items: center; font: 600 26px var(--mono); margin-bottom: 40px; }
+.title-slide h1 { font-size: 96px; max-width: 1250px; }
+.chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 40px; }
+.chips .tag { font-size: 16px; padding: 6px 14px; }
+
+/* Steps */
+.steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; position: relative; }
+.step .n { font: 500 15px var(--mono); color: var(--muted); }
+.step h3 { font: 600 21px var(--sans); margin: 8px 0 8px; }
+.step p { font-size: 16.5px; color: var(--ink-2); margin: 0; }
+.step .t { margin-top: 14px; }
+
+/* Flow rows */
+.flow { display: grid; gap: 14px; }
+.flow-row { display: grid; grid-template-columns: 210px 1fr 150px; gap: 20px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 22px; font-size: 19px; }
+.flow-row .who { justify-self: start; }
+.flow-row .ms { font: 500 17px var(--mono); color: var(--muted); text-align: right; }
+
+/* Tables */
+table.t { width: 100%; border-collapse: collapse; font-size: 19px; }
+table.t th { text-align: left; font: 600 14px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 16px 12px 0; border-bottom: 1px solid var(--line); }
+table.t td { padding: 14px 16px 14px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+table.t td:first-child { color: var(--ink); font-weight: 500; }
+
+/* Bars */
+.bars { display: grid; gap: 9px; }
+.bar-row { display: grid; grid-template-columns: 300px 1fr 50px; gap: 16px; align-items: center; font-size: 17px; }
+.bar-track { height: 18px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.bar-row .v { font: 500 16px var(--mono); color: var(--muted); text-align: right; }
+
+/* Chrome */
+#chrome { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 14px; padding: 10px 18px; font: 13px var(--mono); color: var(--muted); z-index: 5; }
+#chrome button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font: 13px var(--sans); cursor: pointer; }
+#chrome button:hover { border-color: var(--accent); }
+#progress { flex: 1; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+#progress i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+#chrome a { color: var(--accent); text-decoration: none; font-family: var(--sans); }
+
+@media print {
+  @page { size: 1600px 900px; margin: 0; }
+  body { overflow: visible; background: none; }
+  #viewport { position: static; display: block; }
+  #deck { transform: none !important; width: auto; height: auto; }
+  .slide { display: flex !important; position: relative; width: 1600px; height: 900px; page-break-after: always; box-shadow: none; border-radius: 0; }
+  #chrome { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="deck">
+
+<!-- 1. Title -->
+<section class="slide title-slide">
+  <div class="mark">WB</div>
+  <div class="kicker">Data-processing layer · Agentic RAG</div>
+  <h1>The World Bank Knowledge Graph</h1>
+  <p class="lead">A library of World Bank publications that sorts itself into a domain graph as documents arrive, and an agent that answers questions with page-level citations it checks.</p>
+  <div class="chips">
+    <span class="tag acc">liteparse</span><span class="tag jev">Jev · TypeSafe System One</span>
+    <span class="tag glm">GLM 5.3 flash · Workers AI</span><span class="tag acc">Cloudflare Vectorize</span><span class="tag acc">SQLite FTS5</span>
+  </div>
+  <div class="foot"><span>October 2026</span><span data-live="summary"></span></div>
+</section>
+
+<!-- 2. Architecture -->
+<section class="slide">
+  <div class="kicker">Architecture</div>
+  <h2 style="margin-bottom: 18px">One pipeline in, one app out</h2>
+  <svg viewBox="0 0 1408 600" style="width: 100%; flex: 1;" role="img" aria-label="Architecture diagram">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+      </marker>
+    </defs>
+    <style>
+      .bx { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+      .bx.jev { fill: var(--jev-soft); stroke: var(--jev); }
+      .bx.glm { fill: var(--glm-soft); stroke: var(--glm); }
+      .bx.acc { fill: var(--accent-soft); stroke: var(--accent); }
+      .h { font-size: 19px; font-weight: 600; fill: var(--ink); }
+      .s { font-size: 15px; fill: var(--ink-2); }
+      .col { font-size: 13px; font-weight: 600; letter-spacing: .12em; fill: var(--muted); }
+      .ln { stroke: var(--muted); stroke-width: 1.8; fill: none; marker-end: url(#ar); }
+      .lnd { stroke: var(--muted); stroke-width: 1.5; fill: none; stroke-dasharray: 5 5; marker-end: url(#ar); }
+      .lbl { font-size: 13.5px; fill: var(--muted); font-family: var(--mono); }
+    </style>
+
+    <text class="col" x="0" y="16">SOURCES</text>
+    <text class="col" x="270" y="16">PARSE</text>
+    <text class="col" x="540" y="16">ROUTE INTO THE GRAPH</text>
+    <text class="col" x="880" y="16">INDEX</text>
+    <text class="col" x="1150" y="16">SERVE · :3000</text>
+
+    <!-- Sources -->
+    <rect class="bx" x="0" y="40" width="220" height="96" rx="12"/>
+    <text class="h" x="18" y="74">Documents API</text>
+    <text class="s" x="18" y="98">documents.worldbank.org</text>
+    <text class="s" x="18" y="120">24 themes · English · 2019+</text>
+    <rect class="bx" x="0" y="160" width="220" height="76" rx="12"/>
+    <text class="h" x="18" y="194">Upload / URL</text>
+    <text class="s" x="18" y="218">POST /api/documents</text>
+
+    <!-- Parse -->
+    <rect class="bx acc" x="270" y="40" width="220" height="196" rx="12"/>
+    <text class="h" x="288" y="74">liteparse</text>
+    <text class="s" x="288" y="98">PDFium, local, no OCR</text>
+    <text class="s" x="288" y="122">≈2–5 ms per page</text>
+    <text class="s" x="288" y="158">Page-aware chunks</text>
+    <text class="s" x="288" y="182">1,100 chars · 150 overlap</text>
+    <text class="s" x="288" y="206">id = doc:page:n</text>
+
+    <!-- Route -->
+    <rect class="bx jev" x="540" y="40" width="290" height="110" rx="12"/>
+    <text class="h" x="558" y="74">Jev fan-out</text>
+    <text class="s" x="558" y="98">one noul per area and domain,</text>
+    <text class="s" x="558" y="120">all in one call · ≈110–200 ms</text>
+    <rect class="bx" x="540" y="190" width="130" height="64" rx="12"/>
+    <text class="h" x="556" y="218" style="font-size:16px">≥ 0.7</text>
+    <text class="s" x="556" y="240">tag domains</text>
+    <rect class="bx glm" x="700" y="190" width="130" height="64" rx="12"/>
+    <text class="h" x="716" y="218" style="font-size:16px">none fit</text>
+    <text class="s" x="716" y="240">GLM creates</text>
+    <rect class="bx" x="540" y="296" width="290" height="96" rx="12"/>
+    <text class="h" x="558" y="328">Domain graph</text>
+    <text class="s" x="558" y="352">area → domain, scored tags</text>
+    <text class="s" x="558" y="374">next document is scored against it</text>
+
+    <!-- Index -->
+    <rect class="bx" x="880" y="40" width="220" height="110" rx="12"/>
+    <text class="h" x="898" y="74">bge-base-en-v1.5</text>
+    <text class="s" x="898" y="98">768-d embeddings</text>
+    <text class="s" x="898" y="120">Workers AI, batches of 100</text>
+    <rect class="bx acc" x="880" y="180" width="220" height="86" rx="12"/>
+    <text class="h" x="898" y="212">Vectorize</text>
+    <text class="s" x="898" y="236">world-bank-docs · cosine</text>
+    <rect class="bx" x="880" y="296" width="220" height="96" rx="12"/>
+    <text class="h" x="898" y="328">SQLite + FTS5</text>
+    <text class="s" x="898" y="352">documents, chunks, graph</text>
+    <text class="s" x="898" y="374">BM25 in ≈1–7 ms</text>
+
+    <!-- Serve -->
+    <rect class="bx" x="1150" y="40" width="258" height="110" rx="12"/>
+    <text class="h" x="1168" y="74">Live sources tray</text>
+    <text class="s" x="1168" y="98">BM25 every keystroke</text>
+    <text class="s" x="1168" y="120">hybrid + Jev after 220 ms</text>
+    <rect class="bx" x="1150" y="180" width="258" height="212" rx="12"/>
+    <text class="h" x="1168" y="212">Agent  /api/ask</text>
+    <text class="s" x="1168" y="240"><tspan fill="var(--jev)">Jev</tspan> route + grade passages</text>
+    <text class="s" x="1168" y="266"><tspan fill="var(--glm)">GLM</tspan> plans tool calls</text>
+    <text class="s" x="1168" y="292">search · read_page · list_*</text>
+    <text class="s" x="1168" y="318"><tspan fill="var(--glm)">GLM</tspan> streams cited answer</text>
+    <text class="s" x="1168" y="344"><tspan fill="var(--jev)">Jev</tspan> checks each citation</text>
+    <text class="s" x="1168" y="370">optional domain scope</text>
+
+    <!-- Arrows -->
+    <path class="ln" d="M220 88 H268"/>
+    <path class="ln" d="M220 198 H268"/>
+    <path class="ln" d="M490 95 H538"/>
+    <path class="ln" d="M620 150 V188"/>
+    <path class="ln" d="M765 150 V188"/>
+    <path class="ln" d="M605 254 V294"/>
+    <path class="ln" d="M765 254 V294"/>
+    <path class="ln" d="M490 200 H512 Q 520 200 520 210 V 452 Q 520 462 530 462 H 846 Q 856 462 856 452 V 105 Q 856 95 866 95 H 878"/>
+    <path class="ln" d="M856 462 H 980 Q 990 462 990 452 V 394"/>
+    <text class="lbl" x="560" y="452">chunks → embeddings and FTS5</text>
+    <path class="ln" d="M990 150 V178"/>
+    <path class="ln" d="M1100 95 H1148"/>
+    <path class="ln" d="M1100 223 H1148"/>
+    <path class="ln" d="M1100 344 H1148"/>
+    <!-- Legend -->
+    <rect class="bx jev" x="0" y="540" width="22" height="22" rx="5"/><text class="s" x="32" y="557">Jev: every decision (typed, calibrated, ≈100–500 ms)</text>
+    <rect class="bx glm" x="470" y="540" width="22" height="22" rx="5"/><text class="s" x="502" y="557">GLM: everything that must be written</text>
+    <rect class="bx acc" x="850" y="540" width="22" height="22" rx="5"/><text class="s" x="882" y="557">Storage and parsing</text>
+  </svg>
+  <div class="foot"><span>Knowledge Graph</span><span>2</span></div>
+</section>
+
+<!-- 3. Ingestion -->
+<section class="slide">
+  <div class="kicker">Ingestion</div>
+  <h2>Five steps per document, resumable at each one</h2>
+  <div class="steps">
+    <div class="step"><div class="n">01</div><h3>Acquire</h3><p>Query the Documents API across 24 themes, round-robin. Skip files over 25 MB and anything without a <code>%PDF-</code> header.</p><div class="t"><span class="tag acc">146 PDFs</span></div></div>
+    <div class="step"><div class="n">02</div><h3>Parse</h3><p>liteparse returns text per page. Strip disclosure stamps, cap at 80 pages, reject scans with no text layer.</p><div class="t"><span class="tag acc">~1 s / 45 pages</span></div></div>
+    <div class="step"><div class="n">03</div><h3>Chunk</h3><p>About 1,100 characters, cut at sentences, never across pages, so every chunk keeps its page number for citations.</p><div class="t"><span class="tag acc">18k chunks</span></div></div>
+    <div class="step" style="border-color: var(--jev)"><div class="n">04</div><h3>Route</h3><p>Jev scores the document against the whole tree. Below threshold, GLM creates domains. Runs <b>one document at a time</b>.</p><div class="t"><span class="tag jev">Jev ≈ 0.2 s</span> <span class="tag glm">GLM ≈ 15–55 s</span></div></div>
+    <div class="step"><div class="n">05</div><h3>Index</h3><p>Embed title + chunk, upsert NDJSON to Vectorize in batches of 500. Up to four documents in flight behind routing.</p><div class="t"><span class="tag acc">≈3 s / doc</span></div></div>
+  </div>
+  <div class="cols" style="grid-template-columns: 1fr 1fr; margin-top: 28px; flex: 0;">
+    <div class="card"><h3>Why routing is sequential</h3><p>Each document may add a domain. The next document has to be scored against the tree that includes it, or two near-identical domains get created in parallel.</p></div>
+    <div class="card"><h3>Status column = checkpoint</h3><p><span class="mono">downloaded → parsed → routed → indexed</span>. A crash or transient API error resumes from the last finished step; nothing is redone.</p></div>
+  </div>
+  <div class="foot"><span>Knowledge Graph</span><span>3</span></div>
+</section>
+
+<!-- 4. Numbers -->
+<section class="slide">
+  <div class="kicker">Where it stands · live</div>
+  <h2>By the numbers</h2>
+  <div class="cols" style="grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto; align-content: start;">
+    <div class="card"><div class="big" data-live="indexed_docs">–</div><div class="stat-label">documents indexed</div></div>
+    <div class="card"><div class="big" data-live="pages">–</div><div class="stat-label">pages parsed (≤ 80 per doc)</div></div>
+    <div class="card"><div class="big" data-live="vectors">–</div><div class="stat-label">vectors in <span class="mono">world-bank-docs</span></div></div>
+    <div class="card"><div class="big" data-live="failed">–</div><div class="stat-label">failed documents</div></div>
+    <div class="card"><div class="big" style="font-size: 52px">3–7 ms</div><div class="stat-label">keyword sources per keystroke</div></div>
+    <div class="card"><div class="big" style="font-size: 52px">~0.2 s</div><div class="stat-label">Jev routing (document or question)</div></div>
+    <div class="card"><div class="big" style="font-size: 52px">0.3–1 s</div><div class="stat-label">semantic sources + domains</div></div>
+    <div class="card"><div class="big" style="font-size: 52px">20–70 s</div><div class="stat-label">full cited answer (GLM reasoning)</div></div>
+  </div>
+  <div class="foot"><span>Latencies measured in testing on this deployment</span><span>4</span></div>
+</section>
+
+</div></div>
+
+<div id="chrome">
+  <button id="prev" aria-label="Previous slide">←</button>
+  <button id="next" aria-label="Next slide">→</button>
+  <span id="count"></span>
+  <div id="progress"><i></i></div>
+  <a href="/">App</a>
+  <button id="print" title="Save as PDF via the print dialog">Print / PDF</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+let i = 0;
+function show(n) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('active', k === i));
+  document.getElementById('count').textContent = `${i + 1} / ${slides.length}`;
+  document.querySelector('#progress i').style.width = `${((i + 1) / slides.length) * 100}%`;
+  try { history.replaceState(null, '', `#${i + 1}`); } catch {}
+}
+function fit() {
+  const s = Math.min(window.innerWidth / 1640, (window.innerHeight - 60) / 930);
+  document.getElementById('deck').style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+document.addEventListener('keydown', (e) => {
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(i + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+  if (e.key === 'Home') show(0);
+  if (e.key === 'End') show(slides.length - 1);
+});
+document.getElementById('prev').onclick = () => show(i - 1);
+document.getElementById('next').onclick = () => show(i + 1);
+document.getElementById('print').onclick = () => window.print();
+let tx = null;
+document.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend', (e) => {
+  if (tx == null) return;
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+  tx = null;
+});
+window.addEventListener('resize', fit);
+window.addEventListener('hashchange', () => { const n = parseInt(location.hash.slice(1), 10); if (n && n - 1 !== i) show(n - 1); });
+fit();
+show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+
+// Live numbers from the running system.
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+fetch('/api/stats').then((r) => r.json()).then((s) => {
+  document.querySelectorAll('[data-live]').forEach((el) => {
+    const k = el.dataset.live;
+    if (k === 'summary') el.textContent = `${s.indexed_docs} documents · ${s.vectors.toLocaleString()} vectors · ${s.areas} areas · ${s.domains} domains`;
+    else if (s[k] != null) el.textContent = typeof s[k] === 'number' ? s[k].toLocaleString() : s[k];
+  });
+}).catch(() => {});
+fetch('/api/domains').then((r) => r.json()).then((tree) => {
+  const top = tree.slice().sort((a, b) => b.docs - a.docs).slice(0, 14);
+  const max = Math.max(...top.map((a) => a.docs), 1);
+  document.getElementById('area-bars').innerHTML = top.map((a) => `
+    <div class="bar-row"><span>${esc(a.name)}</span><div class="bar-track"><div class="bar-fill" style="width:${(a.docs / max) * 100}%"></div></div><span class="v">${a.docs}</span></div>`).join('');
+}).catch(() => {});
+</script>
+</body>
+</html>
